@@ -59,8 +59,12 @@ Repeat for each app:
 3. **Runtime**: Python 3.
 4. **Build Command**:
    ```
-   pip install uv && uv sync --locked
+   pip install uv && uv sync
    ```
+   (Don't use `uv sync --locked` here — Render's Python runtime version and
+   uv version won't always match what generated `uv.lock` locally, and
+   `--locked` hard-fails the build on any mismatch instead of just
+   re-resolving. Plain `uv sync` updates the lock at build time if needed.)
 5. **Start Command** (matches the local test command exactly):
    ```
    uv run weather.py

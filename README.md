@@ -84,15 +84,36 @@ injects it, and that's exactly what triggers the streamable-http branch in
 
 ## 3. Verify the deployed server responds
 
+The path is always `/mcp` — it doesn't change per app, so don't append the
+app name (`/mcp/currency` etc. will 404).
+
+In Windows PowerShell, use `Invoke-RestMethod` rather than `curl` — `curl` is
+aliased to `Invoke-WebRequest` (no `-X`/`-d` support), and even `curl.exe`
+called explicitly is unreliable here: PowerShell re-escapes arguments when
+calling a native `.exe`, which can strip the double quotes out of an inline
+JSON string and produce exactly the parse error you'd see back
+(`"key must be a string"`). Building the body as a PowerShell object and
+letting `ConvertTo-Json` serialize it sidesteps that entirely:
+
 ```powershell
-curl https://<your-service>.onrender.com/mcp `
-  -X POST `
-  -H "Content-Type: application/json" `
-  -H "Accept: application/json, text/event-stream" `
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+$body = @{
+    jsonrpc = "2.0"
+    id      = 1
+    method  = "initialize"
+    params  = @{
+        protocolVersion = "2025-06-18"
+        capabilities    = @{}
+        clientInfo      = @{ name = "test"; version = "1.0" }
+    }
+} | ConvertTo-Json -Depth 10
+
+Invoke-RestMethod -Uri "https://<your-service>.onrender.com/mcp" -Method Post `
+  -Headers @{ "Accept" = "application/json, text/event-stream" } `
+  -ContentType "application/json" `
+  -Body $body
 ```
 
-A `200` with a JSON-RPC result back means the server is live.
+A JSON-RPC result back (not an `error` field) means the server is live.
 
 ## 4. Connect Claude to the deployed server
 
@@ -126,3 +147,10 @@ over stdio — it doesn't touch Render or `PORT` at all:
 
 Render auto-deploys on every push to the connected branch. Commit, push, and
 the dashboard shows the new build/deploy.
+
+
+curl https://currency-lly8.onrender.com/mcp/currency `
+  -X POST `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json, text/event-stream" `
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'

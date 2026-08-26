@@ -1,16 +1,17 @@
   # 1. imports and constants
 
-import os
-from typing import Any
-import httpx
-from mcp.server.mcpserver import MCPServer
+import os  # Read the PORT env var so main() can pick stdio vs. HTTP transport
+from typing import Any  # Type-hint the loosely-structured JSON returned by the NWS API
+import httpx  # Async HTTP client used to call the National Weather Service API
+from mcp.server.mcpserver import MCPServer  # MCP SDK class that turns this script into an MCP server
 NWS_API_BASE = "https://api.weather.gov"
-USER_AGENT = "weather-app/1.0"
+USER_AGENT = "weather-app/1.0"  # entirely made up by whoever wrote this script
 
 # 2.Initialize FastMCP server
 mcp = MCPServer("weather", version="1.0.0")
 
-# 3. helper functions  
+# 3. helper functions   are the internal functions that do supporting work 
+# for the tools but aren't themselves exposed to Claude as callable tools/resources/prompts
 async def make_nws_request(url: str) -> dict[str, Any] | None:
     """Make a request to the NWS API with proper error handling."""
     headers = {"User-Agent": USER_AGENT, "Accept": "application/geo+json"}
@@ -36,8 +37,9 @@ Instructions: {props.get('instruction', 'No specific instructions provided')}
 
 # 4. @mcp.tool / @mcp.resource / @mcp.prompt  
 @mcp.tool()
-async def get_alerts(state: str) -> str:
-    """Get weather alerts for a US state.
+async def get_alerts(state: str) -> str:  
+    """Get weather alerts for a US state. Call an external HTTP API and format the response, the function is async so that other tools 
+    can be called while this function waits for a response.
 
     Args:
         state: Two-letter US state code (e.g. CA, NY)
@@ -88,7 +90,11 @@ Forecast: {period['detailedForecast']}
     return "\n---\n".join(forecasts)
 
 
-# 5. Resources (URI-addressable read-only data):    
+# 5. Resources (URI-addressable read-only data):  
+# read-only data exposed at a URI, rather than an action Claude invokes with arguments like a tool.  
+# a person can browse available resources and manually attach weather://alerts/CA to a conversation  
+# MCP supports things like subscribing to a resource for update notifications — a pattern that doesn't 
+# map cleanly onto a tool call.
 @mcp.resource("weather://alerts/{state}")
 async def alerts_resource(state: str) -> str:
     """Active weather alerts for a US state."""
@@ -106,6 +112,7 @@ def weather_briefing(state: str) -> str:
 
 
 # 7. Start the server with a transport
+# JSON-RPC messages back and forth between the client (Claude) and the server (your weather.py process) 
 class _LowercasePathApp:
     """Some MCP clients mangle the path's case (e.g. /mcp -> /MCP) when a
     connector URL is entered; routes are case-sensitive, so normalize here

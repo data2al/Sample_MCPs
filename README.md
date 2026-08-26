@@ -18,16 +18,29 @@ over **stdio**. Render instead runs it as a long-lived web process and needs
 def main():
     port = os.environ.get("PORT")
     if port:
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=int(port))
+        import uvicorn
+
+        uvicorn.run(_LowercasePathApp(mcp.streamable_http_app(host="0.0.0.0")), host="0.0.0.0", port=int(port))
     else:
         mcp.run(transport="stdio")
 ```
 
+The HTTP branch serves the app through `uvicorn` directly (rather than
+`mcp.run(transport="streamable-http")`) so it can wrap the ASGI app in
+`_LowercasePathApp`, which lowercases incoming request paths — some MCP
+clients mangle `/mcp` to `/MCP` when a connector URL is typed in, and routes
+are case-sensitive.
+
 Render always sets a `PORT` environment variable for web services, so nothing
 needs to be configured — the same `weather.py` / `currency.py` file runs
-correctly in both places. Test the HTTP path locally first with
-`005_run_http_locally.ps1` (weather) or `010_run_http_locally_currency.ps1`
-(currency) before deploying.
+correctly in both places. Test the HTTP path locally first by setting `PORT`
+before deploying:
+
+```powershell
+cd weather   # or currency
+$env:PORT = 8000
+uv run weather.py   # or: uv run currency.py
+```
 
 ## 1. Push each app to its own GitHub repo
 
@@ -120,8 +133,12 @@ A JSON-RPC result back (not an `error` field) means the server is live.
 On [claude.ai](https://claude.ai): **Settings → Connectors → Add custom
 connector**, and paste the Render URL with `/mcp` on the end, e.g.
 `https://weather-xxxx.onrender.com/mcp`. Repeat for the currency service.
-Claude will list `get_alerts` / `get_forecast` (weather) or
-`get_exchange_rate` / `convert` (currency) as available tools once connected.
+Claude will list the following once connected:
+
+- **weather**: tools `get_alerts` / `get_forecast`, resource
+  `weather://alerts/{state}`, prompt `weather_briefing`
+- **currency**: tools `get_exchange_rate` / `convert`, resource
+  `currency://rates/{base}`, prompt `conversion_briefing`
 
 ## Local use (Claude Desktop) still works unchanged
 
@@ -148,9 +165,15 @@ over stdio — it doesn't touch Render or `PORT` at all:
 Render auto-deploys on every push to the connected branch. Commit, push, and
 the dashboard shows the new build/deploy.
 
+## Optional: add the weather Skill on claude.ai
 
-curl https://currency-lly8.onrender.com/mcp/currency `
-  -X POST `
-  -H "Content-Type: application/json" `
-  -H "Accept: application/json, text/event-stream" `
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+`weather-mcp-tools/` at the root of this folder is a [Claude Skill](https://www.anthropic.com/news/skills)
+(a `SKILL.md` instructions file) that teaches Claude how to correctly call
+the weather connector's tools — e.g. that `get_alerts` needs a two-letter
+state code, `get_forecast` needs decimal lat/long, and that an empty-results
+message is a valid answer, not a failed call. It doesn't replace or
+duplicate the connector; it works alongside it.
+
+To use it on claude.ai: zip the `weather-mcp-tools` folder (it must contain
+`SKILL.md` at its root) and upload it under **Settings → Capabilities →
+Skills**.

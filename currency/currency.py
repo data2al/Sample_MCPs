@@ -1,9 +1,9 @@
   # 1. imports and constants
 
-import os
-from typing import Any
-import httpx
-from mcp.server.mcpserver import MCPServer
+import os  # Read the PORT env var so main() can pick stdio vs. HTTP transport
+from typing import Any  # Type-hint the loosely-structured JSON returned by the exchange rate API
+import httpx  # Async HTTP client used to call the exchange rate API
+from mcp.server.mcpserver import MCPServer  # MCP SDK class that turns this script into an MCP server
 
 EXCHANGE_API_BASE = "https://open.er-api.com/v6/latest"
 USER_AGENT = "currency-app/1.0"

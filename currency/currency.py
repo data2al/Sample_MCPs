@@ -114,7 +114,7 @@ def main():
     if port:
         import uvicorn
 
-        uvicorn.run(_LowercasePathApp(mcp.streamable_http_app()), host="0.0.0.0", port=int(port))
+        uvicorn.run(_LowercasePathApp(mcp.streamable_http_app(host="0.0.0.0")), host="0.0.0.0", port=int(port))
     else:
         mcp.run(transport="stdio")
 

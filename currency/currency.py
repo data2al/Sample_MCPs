@@ -95,10 +95,26 @@ def conversion_briefing(base: str, target: str) -> str:
 
 
 # 7. Start the server with a transport
+class _LowercasePathApp:
+    """Some MCP clients mangle the path's case (e.g. /mcp -> /MCP) when a
+    connector URL is entered; routes are case-sensitive, so normalize here
+    instead of relying on every client to send it lowercase."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            scope["path"] = scope["path"].lower()
+        await self.app(scope, receive, send)
+
+
 def main():
     port = os.environ.get("PORT")
     if port:
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=int(port))
+        import uvicorn
+
+        uvicorn.run(_LowercasePathApp(mcp.streamable_http_app()), host="0.0.0.0", port=int(port))
     else:
         mcp.run(transport="stdio")
 

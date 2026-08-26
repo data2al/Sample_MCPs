@@ -1,0 +1,16 @@
+[project]
+name = "weather"
+version = "1.0.0"
+description = "Weather MCP server"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp[cli]>=2.1.1",
+]
+
+[project.scripts]
+weather = "weather:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
